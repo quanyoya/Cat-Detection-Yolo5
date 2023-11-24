@@ -1,15 +1,18 @@
 from flask import Flask, request, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from collections import defaultdict
 import torch
 from PIL import Image, ImageDraw, ImageFont
 import os
 import base64
 from io import BytesIO
+import json
+
+# Global variable to store the current date for the detection file
+current_detection_date = None
 
 # Global variable to store detection history
 detection_history = defaultdict(lambda: timedelta(0))
-
 
 last_detection_time = None
 last_cat_position = None
@@ -130,6 +133,7 @@ def detect():
             
             # draw.rectangle([(row['xmin'], row['ymin'] - label_height), (row['xmin'] + label_width, row['ymin'])], fill='red')
             # draw.text((row['xmin'], row['ymin'] - label_height), label, fill='white', font=font)
+
             label_background = [(label_x, label_y), (label_x + label_width, label_y + label_height)]
             draw.rectangle(label_background, fill='black')
             draw.text((label_x, label_y), label, fill='white', font=font)
@@ -160,13 +164,25 @@ def detect():
 
         print(f'Detection Results: {data},{cat_stay}')
 
+        # Prepare data for saving
+        detection_results = {
+            'detections': json.loads(results_data.to_json(orient="records")),
+            'image_path': image_path,
+            'processed_image_path': processed_image_path,
+            'cat_stay': cat_stay
+        }
+
+        # Save the results
+        save_detection_data(detection_results)
+
         # Return the response with paths to saved images
         return jsonify({
-            'detections': data,
+            'detections': detection_results['detections'],
             'image_path': image_path,
             'processed_image_path': processed_image_path,
             'cat_stay': cat_stay
         }), 200
+    
 
 # Functions to check if cat overlaps with sofa or table (requires implementation)
 def overlaps_sofa(cat_detection):
@@ -182,6 +198,28 @@ def overlaps_table(cat_detection):
 
     # Check if there is any overlap
     return not (cat_xmax < table_xmin or cat_xmin > table_xmax or cat_ymax < table_ymin or cat_ymin > table_ymax)
+
+def save_detection_data(data):
+    global current_detection_date
+
+    today = date.today()
+    file_name = f"detection_results_{today}.json"
+    file_path = os.path.join(PROCESSED_FOLDER, file_name)
+
+    # Check if the date has changed
+    if current_detection_date != today:
+        # Date has changed, reset the file for the new date
+        current_detection_date = today
+        with open(file_path, 'w') as file:
+            json.dump([data], file, indent=4)  # Store the data as a list of dictionaries
+    else:
+        # Date is the same, append to the existing file
+        with open(file_path, 'r+') as file:
+            file_data = json.load(file)
+            file_data.append(data)  # Append the new data to the list
+            file.seek(0)  # Reset file position to the beginning
+            json.dump(file_data, file, indent=4)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
