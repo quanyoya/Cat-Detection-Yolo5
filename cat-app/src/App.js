@@ -27,21 +27,6 @@ function App() {
     setupWebcam();
   }, []);
 
-  // const captureImages = () => {
-    // let count = 0;
-    // const intervalId = setInterval(() => {
-    //   if (count >= 5) {
-    //     clearInterval(intervalId);
-    //     return;
-    //   }
-    //   const canvas = canvasRef.current;
-    //   canvas.toBlob(blob => {
-    //     sendImageToBackend(blob);
-    //   }, 'image/jpeg');
-    //   count++;
-    // }, interval);
-  // };
-
   useEffect(() => {
     let intervalId;
 
